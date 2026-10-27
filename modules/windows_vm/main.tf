@@ -1,18 +1,18 @@
 resource "azurerm_network_interface" "nic2" {
   name                = "win-nic"
   location            = "centralindia"
-  resource_group_name = "rg-dev"
+  resource_group_name = "rg-preprod"
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dev/providers/Microsoft.Network/virtualNetworks/vnet-dev/subnets/frontend-subnet-dev"
+    subnet_id                     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-preprod/providers/Microsoft.Network/virtualNetworks/vnet-preprod/subnets/frontend-subnet-preprod"
         private_ip_address_allocation = "Dynamic"
   }
 }
 
-resource "azurerm_windows_virtual_machine" "vm-win" {
-  name                = "win-vm"
-  resource_group_name = "rg-dev"
+resource "azurerm_windows_virtual_machine" "vm-window" {
+  name                = "window-vm"
+  resource_group_name = "rg-preprod" 
   location            = "centralindia"
   size                = "Standard_D2s_v5"
   admin_username      = data.azurerm_key_vault_secret.username.value
@@ -35,7 +35,7 @@ resource "azurerm_windows_virtual_machine" "vm-win" {
 }
 
 resource "random_password" "vm_password" {
-  length           = 24
+  length           = 16
   special          = true
   min_upper        = 2
   min_lower        = 2

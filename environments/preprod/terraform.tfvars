@@ -1,38 +1,38 @@
 rgs = {
   rg1 = {
-    name     = "rg-dev"
+    name     = "rg-preprod"
     location = "centralindia"
   }
 }
 
 vnets = {
   vnet1 = {
-    name                = "vnet-dev"
+    name                = "vnet-preprod"
     location            = "centralindia"
-    resource_group_name = "rg-dev"
+    resource_group_name = "rg-preprod"
     address_space       = ["10.0.0.0/16"]
   }
 }
 
 subnets = {
   snet1 = {
-    name                 = "frontend-subnet-dev"
-    resource_group_name  = "rg-dev"
-    virtual_network_name = "vnet-dev"
+    name                 = "frontend-subnet-preprod"
+    resource_group_name  = "rg-preprod"
+    virtual_network_name = "vnet-preprod"
     address_prefixes     = ["10.0.1.0/24"]
   }
   snet2 = {
     name                 = "AzureBastionSubnet"
-    resource_group_name  = "rg-dev"
-    virtual_network_name = "vnet-dev"
+    resource_group_name  = "rg-preprod"
+    virtual_network_name = "vnet-preprod"
     address_prefixes     = ["10.0.4.0/26"]
   }
 }
 
 public_ips = {
   pip_bastion = {
-    public_ip_name      = "pip-bastion-dev"
-    resource_group_name = "rg-dev"
+    public_ip_name      = "pip-bastion-preprod"
+    resource_group_name = "rg-preprod"
     location            = "centralindia"
     allocation_method   = "Static"
   }
@@ -40,12 +40,12 @@ public_ips = {
 
 vms = {
   frontend_1 = {
-    nic_name        = "frontend-vm-nic-1-dev"
+    nic_name        = "frontend-vm-nic-1-preprod"
     location        = "centralindia"
-    rg_name         = "rg-dev"
-    nic_subnet_name = "frontend-subnet-dev"
-    nic_vnet_name   = "vnet-dev"
-    vm_name         = "frontend-vm-1-dev"
+    rg_name         = "rg-preprod"
+    nic_subnet_name = "frontend-subnet-preprod"
+    nic_vnet_name   = "vnet-preprod"
+    vm_name         = "frontend-vm-1-preprod"
     vm_size         = "Standard_D2ds_v4"
     # admin_username  = "devopsadmin"
     # key_vault_name  = "kv-dev-123"
@@ -79,12 +79,12 @@ vms = {
 
 bastions = {
   bastion1 = {
-    name           = "bastion-dev"
+    name           = "bastion-preprod"
     location       = "centralindia"
-    rg_name        = "rg-dev"
+    rg_name        = "rg-preprod"
     subnet_name    = "AzureBastionSubnet"
-    vnet_name      = "vnet-dev"
-    public_ip_name = "pip-bastion-dev"
+    vnet_name      = "vnet-preprod"
+    public_ip_name = "pip-bastion-preprod"
   }
 }
 
@@ -105,10 +105,10 @@ dns_zones = {
   zone1 = {
     dns_zone_name = "corp.internal"
     a_record_name = "frontend"
-    rg_name       = "rg-dev"
+    rg_name       = "rg-preprod"
     ttl           = 300
-    vmname        = "frontend-vm-1-dev"
-    nicname       = "frontend-vm-nic-1-dev"
-    vnet_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dev/providers/Microsoft.Network/virtualNetworks/vnet-dev"
+    vmname        = "frontend-vm-1-preprod"
+    nicname       = "frontend-vm-nic-1-preprod"
+    vnet_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-preprod/providers/Microsoft.Network/virtualNetworks/vnet-preprod"
   }
 }
