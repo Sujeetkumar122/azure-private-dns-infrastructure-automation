@@ -1,0 +1,289 @@
+pool: Default
+
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+# variables:
+#   - group: Terraform_LandingZone_VariableGroups
+
+parameters:
+  - name: environments
+    type: string
+    values:
+      - preprod
+      - prod
+    default: 'preprod'
+
+  - name: ToolVersion
+    type: boolean
+    default: 'true'
+
+  - name: Scan
+    type: string
+    values:
+      - TFlint
+      - Trivy
+      - TfSec
+      - Checkov
+      - TruffleHog
+
+    default: 'TfSec'
+
+stages:
+  - stage: securityscan_ToolsVerification
+    condition: eq('${{ parameters.ToolVersion }}', 'true')
+    displayName: Terraform SecurityToolsVerification
+    jobs:
+    - job: securityscan_ToolsVerification
+      displayName: Terraform SecurityToolsVerification
+      steps:
+        - checkout: self
+          fetchDepth: 0
+        - powershell: |
+            Write-Host "========================================="
+            Write-Host "Security Tool Versions"
+            Write-Host "========================================="
+
+            terraform version
+            tflint --version
+            tfsec --version
+            checkov --version
+            trufflehog --version
+          displayName: Verify Security Tools
+
+  - stage: Terraform_fmt
+    displayName: Terraform_fmt
+    jobs:
+    - job: Terraform_fmt
+      displayName: Terraform_fmt
+      steps:
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            terraform fmt -recursive
+            terraform fmt -check -recursive
+          displayName: Terraform Format Check
+
+  # - stage: Terraform_Validate
+  #   displayName: Terraform_Validate
+  #   jobs:
+  #   - job: Terraform_Validate
+  #     displayName: Terraform_Validate
+  #     steps:
+  #       - powershell: |
+  #           Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+  #           terraform init -backend=false
+  #           terraform validate
+  #         displayName: Terraform Validate
+
+  - stage: TFlint_Scan
+    dependsOn: [Terraform_fmt]
+    condition: eq('${{ parameters.Scan }}', 'TFlint')
+    displayName: TFlint_Scan
+    jobs:
+    - job: TFlint_Scan
+      displayName: TFlint_Scan
+      steps:
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            tflint --init
+            tflint --format compact
+          displayName: TFLint
+
+  - stage: Trivy_Scan
+    dependsOn: [Terraform_fmt]
+    condition: eq('${{ parameters.Scan }}', 'Trivy')
+    displayName: Trivy_Scan
+    jobs:
+    - job: Trivy_Scan
+      displayName: Trivy_Scan
+      steps:        
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            trivy config . --severity HIGH,CRITICAL --exit-code 1 --format table
+          displayName: Trivy IaC Scan
+
+  - stage: TfSec_Scan
+    dependsOn: [Terraform_fmt]
+    condition: eq('${{ parameters.Scan }}', 'TfSec')
+    displayName: TfSec_Scan
+    jobs:
+    - job: TfSec_Scan
+      displayName: TfSec_Scan
+      steps:  
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            tfsec . --format lovely
+          displayName: tfsec
+
+  - stage: Checkov_Scan
+    dependsOn: [Terraform_fmt]
+    condition: eq('${{ parameters.Scan }}', 'Checkov')
+    displayName: Checkov_Scan
+    jobs:
+    - job: Checkov_Scan
+      displayName: Checkov_Scan
+      steps:  
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            checkov -d . --framework terraform --compact
+          displayName: Checkov
+
+  - stage: TruffleHog_Scan
+    dependsOn: [Terraform_fmt]
+    condition: eq('${{ parameters.Scan }}', 'TruffleHog')
+    displayName: TruffleHog_Scan
+    jobs:
+    - job: TruffleHog_Scan
+      displayName: TruffleHog_Scan
+      steps: 
+        - powershell: |
+            Set-Location "$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}"
+            trufflehog filesystem . --results=verified,unknown --fail --no-update
+          displayName: TruffleHog Secret Scan
+
+  - stage: terraform_init_and_validate
+    dependsOn: [TfSec_Scan]
+    jobs:
+      - job: terraforminit
+        displayName: init
+        # variables:
+        #   - group: Terraform_LandingZone_VariableGroups
+            # workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+            # backendServiceArm: 'azure-service-connection'
+            # backendAzureRmStorageAccountName: variable('storageAccountName')
+            # backendAzureRmContainerName: 'tfstate'
+            # backendAzureRmKey: '${{ parameters.environments }}.tfstate'
+        steps:
+          - task: TerraformTask@5
+            displayName: Init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+              backendServiceArm: 'azure-service-connection'
+              backendAzureRmStorageAccountName: 'sttfstatesujeet01'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'preprod.tfstate'
+
+          - task: TerraformTask@5
+            displayName: Validate
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+
+
+  - stage: terraformplan
+    condition: succeeded()
+    dependsOn: terraform_init_and_validate
+    jobs:
+      - job: terraformplan
+        displayName: plan
+        # # variables:
+        # #   - group: Terraform_LandingZone_VariableGroups
+        #     workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+        #     backendServiceArm: 'azure-service-connection'
+        #     backendAzureRmStorageAccountName: 'sttfstatesujeet01'
+        #     backendAzureRmContainerName: 'tfstate'
+        #     backendAzureRmKey: '${{ parameters.environments }}.tfstate'
+        steps:
+          - task: TerraformTask@5
+            displayName: Init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+              backendServiceArm: 'azure-service-connection'
+              backendAzureRmStorageAccountName: 'sttfstatesujeet01'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'preprod.tfstate'
+
+          - task: TerraformTask@5
+            displayName: Plan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+              commandOptions: '-out=$(Build.ArtifactStagingDirectory)/tfplan'
+              environmentServiceNameAzureRM: 'azure-service-connection'
+          - publish: '$(Build.ArtifactStagingDirectory)/tfplan'
+            artifact: tfplan
+            displayName: Publish Terraform Plan Artifact
+            
+  
+  - stage: manualapproval
+    displayName: Manual Approval
+    dependsOn: terraformplan
+    condition: and(succeeded(),eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+    jobs:
+      - job: approval
+        displayName: Waiting for Approval
+
+        pool: server
+
+        timeoutInMinutes: 1440
+
+        steps:
+          - task: ManualValidation@1
+            displayName: Approve Terraform Apply
+
+            timeoutInMinutes: 05
+
+            inputs:
+              notifyUsers: |
+                sujeetkumar.devsecops@gmail.com
+
+              instructions: |
+                Terraform Plan completed successfully.
+                Please review the plan and approve to continue with Terraform Apply.
+
+              onTimeout: 'reject'
+
+
+  - stage: terraformapply
+    displayName: Terraform Apply
+    dependsOn: manualapproval
+
+    condition: and(succeeded(),eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+    jobs:
+      - job: terraformapply
+        displayName: Apply
+        # # variables:
+        # #   - group: Terraform_LandingZone_VariableGroups
+        #     workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+        #     backendServiceArm: 'azure-service-connection'
+        #     backendAzureRmStorageAccountName: 'sttfstatesujeet01'
+        #     backendAzureRmContainerName: 'tfstate'
+        #     backendAzureRmKey: '${{ parameters.environments }}.tfstate'
+        steps:
+          - task: TerraformTask@5
+            displayName: Init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+              backendServiceArm: 'azure-service-connection'
+              backendAzureRmStorageAccountName: 'sttfstatesujeet01'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'preprod.tfstate'
+
+          - download: current
+            artifact: tfplan
+
+          - task: TerraformTask@5
+            displayName: Terraform Apply
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environments/${{ parameters.environments }}'
+              commandOptions: '$(Pipeline.Workspace)/tfplan/tfplan'
+              environmentServiceNameAzureRM: 'azure-service-connection'
